@@ -27,6 +27,33 @@ Luego abre **http://localhost:3000**.
 - **Nube (opcional, Supabase):** define `SUPABASE_URL` y `SUPABASE_KEY`
   (ver `.env.example`) y ejecuta `supabase-schema.sql` en tu proyecto de Supabase.
 
+## Publicar en internet (Render + Supabase)
+
+> En Render el disco es **efímero**: el archivo `data/activities.json` se borra al
+> reiniciar. Para que las actividades no se pierdan, en producción hay que usar Supabase.
+
+**1. Crear la tabla en Supabase**
+- En tu proyecto de Supabase → **SQL Editor** → ejecuta el contenido de
+  [`supabase-schema.sql`](supabase-schema.sql). Crea la tabla `activities`.
+  (Puedes reutilizar el mismo proyecto Supabase de la app de música.)
+
+**2. Crear el servicio en Render**
+- [render.com](https://render.com) → **New** → **Web Service** → conecta este repositorio.
+- Configuración:
+  - **Build Command:** *(vacío — no hay dependencias)*
+  - **Start Command:** `npm start`
+  - **Instance Type:** Free
+- **Environment Variables:**
+  - `SUPABASE_URL` → la URL de tu proyecto Supabase
+  - `SUPABASE_KEY` → la *anon key* de Supabase
+  - El `PORT` lo asigna Render automáticamente; no lo definas.
+- **Create Web Service**. En ~1–2 min tendrás una URL pública.
+
+Si en los logs aparece `Almacenamiento: Supabase (nube)`, está guardando online. ✅
+
+> **Plan gratis:** el servicio se "duerme" tras un rato sin uso y la primera visita
+> tarda ~30 s en despertar. Para una boda es suficiente.
+
 ## Estructura
 
 ```
