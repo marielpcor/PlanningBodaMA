@@ -59,12 +59,13 @@
     <!-- ===== Agregar actividad ===== -->
     <section class="card form-section" id="agregar">
       <h2 class="section-title">Nueva actividad</h2>
-      <p class="section-hint">Ejemplo: «Prueba de vestido», con la fecha en que se hará.</p>
+      <p class="section-hint">Toca una sugerencia o escribe la tuya, elige el estado y la fecha.</p>
 
       <form id="activity-form" autocomplete="off">
         <div class="field">
           <label for="title">Actividad</label>
           <input type="text" id="title" name="title" placeholder="Ej. Prueba de vestido" required />
+          <div class="suggestions" id="suggestions" aria-label="Sugerencias rápidas"></div>
         </div>
 
         <div class="field-row">
@@ -73,12 +74,13 @@
             <input type="date" id="date" name="date" />
           </div>
           <div class="field">
-            <label for="status">Estado</label>
-            <select id="status" name="status">
-              <option value="pendiente">Pendiente</option>
-              <option value="en_proceso">En proceso</option>
-              <option value="finalizado">Finalizado</option>
-            </select>
+            <label id="status-label">Estado</label>
+            <div class="status-picker" id="status-picker" role="radiogroup" aria-labelledby="status-label">
+              <button type="button" class="status-opt st-pendiente active" data-status="pendiente" role="radio" aria-checked="true"><span class="od"></span>Pendiente</button>
+              <button type="button" class="status-opt st-en_proceso" data-status="en_proceso" role="radio" aria-checked="false"><span class="od"></span>En proceso</button>
+              <button type="button" class="status-opt st-finalizado" data-status="finalizado" role="radio" aria-checked="false"><span class="od"></span>Finalizado</button>
+            </div>
+            <input type="hidden" id="status" name="status" value="pendiente" />
           </div>
         </div>
 
@@ -87,7 +89,7 @@
           <textarea id="description" name="description" rows="2" placeholder="Detalles, lugar, recordatorios…"></textarea>
         </div>
 
-        <button type="submit" class="btn" id="submit-btn">Agregar actividad</button>
+        <button type="submit" class="btn" id="submit-btn"><span class="btn-plus">＋</span> Agregar actividad</button>
         <p class="form-msg" id="form-msg" role="status"></p>
       </form>
     </section>

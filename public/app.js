@@ -81,7 +81,8 @@ $('activity-form').addEventListener('submit', async (e) => {
     });
     activities.push(activity);
     e.target.reset();
-    $('status').value = 'pendiente';
+    setStatus('pendiente');
+    resetSuggestions();
     showMsg(msg, '¡Actividad agregada! 💐', 'ok');
     renderList();
     renderCalendar();
@@ -90,6 +91,54 @@ $('activity-form').addEventListener('submit', async (e) => {
   } finally {
     btn.disabled = false;
   }
+});
+
+// ---------- Sugerencias rápidas + selector de estado ----------
+const SUGGESTIONS = [
+  'Prueba de vestido', 'Reservar salón', 'Degustación de menú', 'Enviar invitaciones',
+  'Sesión de fotos', 'Elegir pastel', 'Música / DJ', 'Flores y decoración',
+  'Lista de invitados', 'Comprar anillos',
+];
+
+function renderSuggestions() {
+  const box = $('suggestions');
+  box.innerHTML = '';
+  SUGGESTIONS.forEach((text) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'suggestion';
+    b.textContent = text;
+    b.addEventListener('click', () => {
+      const input = $('title');
+      input.value = text;
+      input.focus();
+      input.classList.remove('pulse');
+      void input.offsetWidth;        // reinicia la animación
+      input.classList.add('pulse');
+      document.querySelectorAll('#suggestions .suggestion').forEach((s) => {
+        s.classList.toggle('used', s === b);
+      });
+    });
+    box.appendChild(b);
+  });
+}
+
+function resetSuggestions() {
+  document.querySelectorAll('#suggestions .suggestion').forEach((s) => s.classList.remove('used'));
+}
+
+function setStatus(s) {
+  $('status').value = s;
+  document.querySelectorAll('#status-picker .status-opt').forEach((o) => {
+    const on = o.dataset.status === s;
+    o.classList.toggle('active', on);
+    o.setAttribute('aria-checked', String(on));
+  });
+}
+
+$('status-picker').addEventListener('click', (e) => {
+  const opt = e.target.closest('.status-opt');
+  if (opt) setStatus(opt.dataset.status);
 });
 
 function showMsg(el, text, kind) {
@@ -365,5 +414,6 @@ $('tab-calendar').addEventListener('click', () => switchView('calendar'));
   const now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
+  renderSuggestions();
   loadActivities();
 })();
