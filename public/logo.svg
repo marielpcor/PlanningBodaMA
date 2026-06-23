@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 200" width="220" height="200">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D8BE84"/>
+      <stop offset="50%" stop-color="#BFA068"/>
+      <stop offset="100%" stop-color="#9C7E4D"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#gold)" stroke-width="2.2" stroke-linecap="round">
+    <path d="M58 150 C30 130 28 92 46 64"/>
+    <path d="M162 150 C190 130 192 92 174 64"/>
+  </g>
+  <g fill="url(#gold)">
+    <ellipse cx="44" cy="74" rx="9" ry="3.4" transform="rotate(-58 44 74)"/>
+    <ellipse cx="49" cy="92" rx="9" ry="3.4" transform="rotate(-48 49 92)"/>
+    <ellipse cx="55" cy="110" rx="9" ry="3.4" transform="rotate(-38 55 110)"/>
+    <ellipse cx="64" cy="128" rx="9" ry="3.4" transform="rotate(-26 64 128)"/>
+    <ellipse cx="176" cy="74" rx="9" ry="3.4" transform="rotate(58 176 74)"/>
+    <ellipse cx="171" cy="92" rx="9" ry="3.4" transform="rotate(48 171 92)"/>
+    <ellipse cx="165" cy="110" rx="9" ry="3.4" transform="rotate(38 165 110)"/>
+    <ellipse cx="156" cy="128" rx="9" ry="3.4" transform="rotate(26 156 128)"/>
+  </g>
+  <text x="78" y="118" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="58" font-weight="600" fill="#5d6e63">M</text>
+  <text x="110" y="112" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-style="italic" font-size="30" fill="#9c7e4d">&amp;</text>
+  <text x="142" y="118" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="58" font-weight="600" fill="#5d6e63">A</text>
+</svg>

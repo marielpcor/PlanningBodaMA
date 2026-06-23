@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planificador de Boda · M &amp; A</title>
+  <meta name="description" content="Planifica las actividades de nuestra boda: lista con estados, fechas y calendario. M & A" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="logo.svg" type="image/svg+xml" />
+</head>
+<body>
+
+  <!-- ===== Encabezado / Hero ===== -->
+  <header class="hero">
+    <div class="hero__overlay"></div>
+    <div class="hero__content">
+      <!-- Logo monograma M & A -->
+      <div class="monogram" aria-label="M y A">
+        <svg viewBox="0 0 220 200" width="140" height="127" role="img" aria-hidden="true">
+          <defs>
+            <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#D8BE84" />
+              <stop offset="50%" stop-color="#BFA068" />
+              <stop offset="100%" stop-color="#9C7E4D" />
+            </linearGradient>
+          </defs>
+          <!-- corona de laurel -->
+          <g fill="none" stroke="url(#gold)" stroke-width="2.2" stroke-linecap="round">
+            <path d="M58 150 C30 130 28 92 46 64" />
+            <path d="M162 150 C190 130 192 92 174 64" />
+          </g>
+          <g fill="url(#gold)">
+            <ellipse cx="44" cy="74" rx="9" ry="3.4" transform="rotate(-58 44 74)"/>
+            <ellipse cx="49" cy="92" rx="9" ry="3.4" transform="rotate(-48 49 92)"/>
+            <ellipse cx="55" cy="110" rx="9" ry="3.4" transform="rotate(-38 55 110)"/>
+            <ellipse cx="64" cy="128" rx="9" ry="3.4" transform="rotate(-26 64 128)"/>
+            <ellipse cx="176" cy="74" rx="9" ry="3.4" transform="rotate(58 176 74)"/>
+            <ellipse cx="171" cy="92" rx="9" ry="3.4" transform="rotate(48 171 92)"/>
+            <ellipse cx="165" cy="110" rx="9" ry="3.4" transform="rotate(38 165 110)"/>
+            <ellipse cx="156" cy="128" rx="9" ry="3.4" transform="rotate(26 156 128)"/>
+          </g>
+          <!-- iniciales -->
+          <text x="78" y="118" class="mono-letter" text-anchor="middle">M</text>
+          <text x="110" y="112" class="mono-amp" text-anchor="middle">&amp;</text>
+          <text x="142" y="118" class="mono-letter" text-anchor="middle">A</text>
+        </svg>
+      </div>
+
+      <p class="hero__eyebrow">Camino al altar</p>
+      <h1 class="hero__title">Planificador</h1>
+      <p class="hero__subtitle">Organicemos juntos cada detalle de nuestra boda 💍</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== Agregar actividad ===== -->
+    <section class="card form-section" id="agregar">
+      <h2 class="section-title">Nueva actividad</h2>
+      <p class="section-hint">Ejemplo: «Prueba de vestido», con la fecha en que se hará.</p>
+
+      <form id="activity-form" autocomplete="off">
+        <div class="field">
+          <label for="title">Actividad</label>
+          <input type="text" id="title" name="title" placeholder="Ej. Prueba de vestido" required />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="date">Fecha <span class="optional">(opcional)</span></label>
+            <input type="date" id="date" name="date" />
+          </div>
+          <div class="field">
+            <label for="status">Estado</label>
+            <select id="status" name="status">
+              <option value="pendiente">Pendiente</option>
+              <option value="en_proceso">En proceso</option>
+              <option value="finalizado">Finalizado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="description">Nota <span class="optional">(opcional)</span></label>
+          <textarea id="description" name="description" rows="2" placeholder="Detalles, lugar, recordatorios…"></textarea>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn">Agregar actividad</button>
+        <p class="form-msg" id="form-msg" role="status"></p>
+      </form>
+    </section>
+
+    <!-- ===== Pestañas: Lista / Calendario ===== -->
+    <div class="view-tabs" role="tablist" aria-label="Vista">
+      <button class="view-tab active" id="tab-list" role="tab" aria-selected="true">📋 Lista</button>
+      <button class="view-tab" id="tab-calendar" role="tab" aria-selected="false">📅 Calendario</button>
+    </div>
+
+    <!-- ===== Vista LISTA ===== -->
+    <section class="card view" id="view-list">
+      <div class="section-head">
+        <h2 class="section-title">Actividades <span class="count" id="activity-count">0</span></h2>
+      </div>
+
+      <div class="filter-chips" id="filter-chips">
+        <button class="chip active" data-filter="todas">Todas</button>
+        <button class="chip" data-filter="pendiente">Pendiente</button>
+        <button class="chip" data-filter="en_proceso">En proceso</button>
+        <button class="chip" data-filter="finalizado">Finalizado</button>
+      </div>
+
+      <ul class="activity-list" id="activity-list"></ul>
+      <p class="empty-state" id="activities-empty">Aún no hay actividades. ¡Agrega la primera! 💐</p>
+    </section>
+
+    <!-- ===== Vista CALENDARIO ===== -->
+    <section class="card view" id="view-calendar" hidden>
+      <div class="cal-head">
+        <button class="cal-nav" id="cal-prev" aria-label="Mes anterior">‹</button>
+        <h2 class="section-title cal-title" id="cal-title">—</h2>
+        <button class="cal-nav" id="cal-next" aria-label="Mes siguiente">›</button>
+      </div>
+      <p class="section-hint">Las actividades con fecha aparecen marcadas. Toca un día para ver sus actividades.</p>
+
+      <div class="cal-weekdays">
+        <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+
+      <div class="cal-day-detail" id="cal-day-detail" hidden>
+        <h3 class="cal-day-title" id="cal-day-title">—</h3>
+        <ul class="activity-list" id="cal-day-list"></ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="monogram-sm">M &amp; A</div>
+    <p>Con amor, planeando nuestra boda · 2026</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
