@@ -664,6 +664,9 @@ main {
   z-index: 50;
   animation: fadeIn 0.2s ease;
 }
+/* El atributo hidden debe ganar sobre el display:flex de arriba
+   (si no, la capa del modal queda siempre visible y bloquea los toques). */
+.modal-overlay[hidden] { display: none !important; }
 .modal {
   background: var(--white);
   border-radius: var(--radius);
