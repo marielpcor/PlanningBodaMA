@@ -142,9 +142,18 @@
     <section class="card view" id="view-mesas" hidden>
       <div class="section-head">
         <h2 class="section-title">Croquis de mesas <span class="count" id="table-count">0</span></h2>
-        <button type="button" class="btn-mini" id="print-croquis" title="Imprimir el croquis">🖨 Imprimir</button>
+        <div class="head-actions">
+          <button type="button" class="btn-mini" id="export-croquis" title="Descargar la lista de invitados por mesa">📄 Exportar</button>
+          <button type="button" class="btn-mini" id="print-croquis" title="Imprimir el croquis">🖨 Imprimir</button>
+        </div>
       </div>
       <p class="section-hint">Arrastra las mesas para colocarlas como en el salón. Toca una mesa para asignarle invitados.</p>
+
+      <!-- Buscar invitado -->
+      <div class="guest-search">
+        <input type="search" id="guest-search-input" placeholder="🔎 Buscar invitado por nombre…" autocomplete="off" />
+        <ul class="search-results" id="guest-search-results" hidden></ul>
+      </div>
 
       <!-- Agregar mesa -->
       <form class="table-add" id="table-form" autocomplete="off">

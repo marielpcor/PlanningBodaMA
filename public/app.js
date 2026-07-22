@@ -503,6 +503,9 @@ function renderPlano() {
   plano.querySelectorAll('.table-node').forEach((node) => node.remove());
   $('tables-empty').hidden = tables.length > 0;
   tables.forEach((t) => plano.appendChild(tableNodeEl(t)));
+
+  // Reaplica el resaltado de búsqueda tras redibujar.
+  applySearchHighlight();
 }
 
 function tableNodeEl(t) {
@@ -629,18 +632,72 @@ function renderGuestList() {
   counter.textContent = t.capacity ? `${guests.length}/${t.capacity}` : `${guests.length} invitado(s)`;
   counter.classList.toggle('over', isOver(t));
 
+  const others = tables.filter((x) => String(x.id) !== String(t.id));
+
   list.innerHTML = '';
   guests.forEach((name, i) => {
     const li = document.createElement('li');
     li.className = 'guest-item';
     const num = document.createElement('span'); num.className = 'g-num'; num.textContent = i + 1;
     const nm = document.createElement('span'); nm.className = 'g-name'; nm.textContent = name;
+
+    li.appendChild(num);
+    li.appendChild(nm);
+
+    // Mover a otra mesa
+    if (others.length) {
+      const mv = document.createElement('select');
+      mv.className = 'move-select';
+      mv.title = 'Mover a otra mesa';
+      const def = document.createElement('option');
+      def.value = ''; def.textContent = 'Mover a…'; def.disabled = true; def.selected = true;
+      mv.appendChild(def);
+      others.forEach((o) => {
+        const op = document.createElement('option');
+        op.value = o.id;
+        op.textContent = o.name;
+        mv.appendChild(op);
+      });
+      mv.addEventListener('change', () => { if (mv.value) moveGuest(i, mv.value); });
+      li.appendChild(mv);
+    }
+
     const rm = document.createElement('button');
     rm.className = 'icon-btn danger'; rm.textContent = '✕'; rm.title = 'Quitar invitado';
     rm.addEventListener('click', () => removeGuest(i));
-    li.appendChild(num); li.appendChild(nm); li.appendChild(rm);
+    li.appendChild(rm);
+
     list.appendChild(li);
   });
+}
+
+// Mueve un invitado de la mesa actual a la mesa destino.
+async function moveGuest(index, targetId) {
+  const t = currentTable();
+  if (!t) return;
+  const target = tables.find((x) => String(x.id) === String(targetId));
+  if (!target) return;
+  const name = (t.guests || [])[index];
+  if (name == null) return;
+
+  const srcGuests = (t.guests || []).slice();
+  srcGuests.splice(index, 1);
+  const dstGuests = (target.guests || []).concat(name);
+
+  // Actualiza la mesa destino…
+  try {
+    const { table } = await api('/api/tables/' + encodeURIComponent(target.id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guests: dstGuests }),
+    });
+    const i = tables.findIndex((x) => String(x.id) === String(target.id));
+    if (i !== -1) tables[i] = table;
+  } catch (e) { return; }
+
+  // …y la mesa actual (esto ya re-renderiza el plano).
+  await saveTable({ guests: srcGuests });
+  renderGuestList();
 }
 
 async function saveTable(changes) {
@@ -721,6 +778,87 @@ $('table-modal').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('table-modal').hidden) closeTableModal();
 });
+
+// ----- Buscar invitado -----
+function applySearchHighlight() {
+  const input = $('guest-search-input');
+  if (!input) return;
+  const q = input.value.trim().toLowerCase();
+  const ids = new Set();
+  if (q) {
+    tables.forEach((t) => {
+      if ((t.guests || []).some((g) => g.toLowerCase().includes(q))) ids.add(String(t.id));
+    });
+  }
+  document.querySelectorAll('#plano .table-node').forEach((n) => {
+    n.classList.toggle('found', ids.has(n.dataset.id));
+  });
+}
+
+function renderGuestSearch() {
+  const q = $('guest-search-input').value.trim().toLowerCase();
+  const box = $('guest-search-results');
+  box.innerHTML = '';
+
+  if (!q) { box.hidden = true; applySearchHighlight(); return; }
+
+  const matches = [];
+  tables.forEach((t) => {
+    (t.guests || []).forEach((g) => {
+      if (g.toLowerCase().includes(q)) matches.push({ guest: g, table: t });
+    });
+  });
+
+  box.hidden = false;
+  if (!matches.length) {
+    const li = document.createElement('li');
+    li.className = 'no-match';
+    li.textContent = 'Sin coincidencias';
+    box.appendChild(li);
+    applySearchHighlight();
+    return;
+  }
+
+  matches.slice(0, 25).forEach((m) => {
+    const li = document.createElement('li');
+    li.className = 'search-result';
+    const nm = document.createElement('span'); nm.className = 'sr-name'; nm.textContent = m.guest;
+    const tb = document.createElement('span'); tb.className = 'sr-table'; tb.textContent = '→ ' + m.table.name;
+    li.appendChild(nm); li.appendChild(tb);
+    li.addEventListener('click', () => openTableModal(m.table.id));
+    box.appendChild(li);
+  });
+  applySearchHighlight();
+}
+$('guest-search-input').addEventListener('input', renderGuestSearch);
+
+// ----- Exportar la lista por mesa -----
+function exportList() {
+  if (!tables.length) { alert('Aún no hay mesas que exportar.'); return; }
+  const lines = ['Croquis de mesas — M & A', '========================', ''];
+  let total = 0;
+  tables.forEach((t) => {
+    const g = t.guests || [];
+    total += g.length;
+    const cap = t.capacity ? `/${t.capacity}` : '';
+    lines.push(`${t.name} (${g.length}${cap})`);
+    if (g.length) g.forEach((name, i) => lines.push(`  ${i + 1}. ${name}`));
+    else lines.push('  (sin invitados)');
+    lines.push('');
+  });
+  lines.push(`Total: ${tables.length} mesa(s) · ${total} invitado(s)`);
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mesas-invitados-M-y-A.txt';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('export-croquis').addEventListener('click', exportList);
 
 $('print-croquis').addEventListener('click', () => window.print());
 

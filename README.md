@@ -5,7 +5,7 @@ App web para organizar las actividades de la boda. Permite:
 - **Lista de actividades** con estado: **Pendiente**, **En proceso** y **Finalizado**.
 - Asignar una **fecha** a cada actividad (ej. «Prueba de vestido» → 15 de agosto).
 - Una **vista de calendario** donde las actividades con fecha aparecen marcadas y, al tocar un día, se ven sus actividades.
-- Un **croquis de mesas** interactivo: crea mesas (redondas o rectangulares), **arrástralas** por el plano como quedarán en el salón, asígnales invitados por nombre y controla el cupo. Se puede **imprimir**.
+- Un **croquis de mesas** interactivo: crea mesas (redondas o rectangulares), **arrástralas** por el plano como quedarán en el salón, asígnales invitados por nombre y controla el cupo. Además puedes **mover invitados entre mesas**, **buscar un invitado** (resalta su mesa) y **exportar/imprimir** la lista por mesa.
 - Notas opcionales, filtros por estado, editar y eliminar.
 
 Comparte la paleta y el monograma **M & A** de la app de música de la boda.
