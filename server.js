@@ -77,6 +77,34 @@ function normalizeStatus(raw) {
   return STATUSES.includes(s) ? s : 'pendiente';
 }
 
+const SHAPES = ['round', 'rect'];
+function normalizeShape(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  return SHAPES.includes(s) ? s : 'round';
+}
+// Capacidad: entero >= 0, o null si no se indica.
+function normalizeCapacity(raw) {
+  if (raw == null || raw === '') return null;
+  const n = parseInt(raw, 10);
+  if (Number.isNaN(n) || n < 0) return null;
+  return Math.min(n, 100);
+}
+// Coordenada en porcentaje (0–100) dentro del plano.
+function normalizeCoord(raw, fallback) {
+  const n = Number(raw);
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(0, Math.min(100, n));
+}
+// Lista de invitados: strings no vacíos.
+function normalizeGuests(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((g) => String(g).trim())
+    .filter(Boolean)
+    .slice(0, 60)
+    .map((g) => g.slice(0, 60));
+}
+
 // ---------- Lógica de actividades ----------
 async function createActivity(req, res) {
   const body = await readBody(req);
@@ -119,6 +147,52 @@ async function removeActivity(req, res, id) {
   sendJson(res, 200, { ok: true });
 }
 
+// ---------- Lógica de mesas ----------
+async function createTable(req, res) {
+  const body = await readBody(req);
+  const name = (body.name || '').trim();
+  if (!name) return sendJson(res, 400, { error: 'Por favor escribe el nombre de la mesa.' });
+
+  const now = new Date().toISOString();
+  const table = await backend.addTable({
+    name,
+    shape: normalizeShape(body.shape),
+    capacity: normalizeCapacity(body.capacity),
+    x: normalizeCoord(body.x, 10),
+    y: normalizeCoord(body.y, 10),
+    guests: normalizeGuests(body.guests),
+    createdAt: now,
+    updatedAt: now,
+  });
+  sendJson(res, 200, { table });
+}
+
+async function patchTable(req, res, id) {
+  const body = await readBody(req);
+  const changes = {};
+  if ('name' in body) {
+    const n = (body.name || '').trim();
+    if (!n) return sendJson(res, 400, { error: 'El nombre no puede quedar vacío.' });
+    changes.name = n;
+  }
+  if ('shape' in body) changes.shape = normalizeShape(body.shape);
+  if ('capacity' in body) changes.capacity = normalizeCapacity(body.capacity);
+  if ('x' in body) changes.x = normalizeCoord(body.x, 10);
+  if ('y' in body) changes.y = normalizeCoord(body.y, 10);
+  if ('guests' in body) changes.guests = normalizeGuests(body.guests);
+  changes.updatedAt = new Date().toISOString();
+
+  const table = await backend.updateTable(id, changes);
+  if (!table) return sendJson(res, 404, { error: 'Mesa no encontrada.' });
+  sendJson(res, 200, { table });
+}
+
+async function removeTable(req, res, id) {
+  const ok = await backend.deleteTable(id);
+  if (!ok) return sendJson(res, 404, { error: 'Mesa no encontrada.' });
+  sendJson(res, 200, { ok: true });
+}
+
 // ---------- Router ----------
 const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://x').pathname;
@@ -139,6 +213,30 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === 'DELETE' && id) {
         return await removeActivity(req, res, id);
+      }
+    } catch (e) {
+      return sendJson(res, 500, { error: 'Error en el servidor.' });
+    }
+    res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('Método no permitido');
+  }
+
+  // /api/tables  ó  /api/tables/:id
+  const tmatch = pathname.match(/^\/api\/tables(?:\/([^/]+))?$/);
+  if (tmatch) {
+    const id = tmatch[1] ? decodeURIComponent(tmatch[1]) : null;
+    try {
+      if (req.method === 'GET' && !id) {
+        return sendJson(res, 200, { tables: await backend.getTables() });
+      }
+      if (req.method === 'POST' && !id) {
+        return await createTable(req, res);
+      }
+      if (req.method === 'PATCH' && id) {
+        return await patchTable(req, res, id);
+      }
+      if (req.method === 'DELETE' && id) {
+        return await removeTable(req, res, id);
       }
     } catch (e) {
       return sendJson(res, 500, { error: 'Error en el servidor.' });

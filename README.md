@@ -5,6 +5,7 @@ App web para organizar las actividades de la boda. Permite:
 - **Lista de actividades** con estado: **Pendiente**, **En proceso** y **Finalizado**.
 - Asignar una **fecha** a cada actividad (ej. «Prueba de vestido» → 15 de agosto).
 - Una **vista de calendario** donde las actividades con fecha aparecen marcadas y, al tocar un día, se ven sus actividades.
+- Un **croquis de mesas** interactivo: crea mesas (redondas o rectangulares), **arrástralas** por el plano como quedarán en el salón, asígnales invitados por nombre y controla el cupo. Se puede **imprimir**.
 - Notas opcionales, filtros por estado, editar y eliminar.
 
 Comparte la paleta y el monograma **M & A** de la app de música de la boda.
@@ -59,9 +60,9 @@ Si en los logs aparece `Almacenamiento: Supabase (nube)`, está guardando online
 ```
 server.js              Servidor HTTP + API REST (Node nativo)
 storage.js             Almacenamiento: archivos locales o Supabase
-supabase-schema.sql    Tabla de actividades para Supabase
+supabase-schema.sql    Tablas de actividades y mesas para Supabase
 public/
-  index.html           Página (vistas Lista y Calendario)
+  index.html           Página (vistas Lista, Calendario y Mesas)
   styles.css           Estilos (paleta verde salvia + dorado)
   app.js               Lógica del frontend
   logo.svg             Monograma M & A
@@ -76,6 +77,13 @@ data/                  Datos locales (no se versionan)
 | POST   | `/api/activities`        | Crea una actividad                   |
 | PATCH  | `/api/activities/:id`    | Actualiza (estado, fecha, nota…)     |
 | DELETE | `/api/activities/:id`    | Elimina una actividad                |
+| GET    | `/api/tables`            | Lista todas las mesas                |
+| POST   | `/api/tables`            | Crea una mesa                        |
+| PATCH  | `/api/tables/:id`        | Actualiza (posición, forma, cupo, invitados…) |
+| DELETE | `/api/tables/:id`        | Elimina una mesa                     |
 
 Campos de una actividad: `title`, `description`, `date` (`YYYY-MM-DD` o `null`),
 `status` (`pendiente` · `en_proceso` · `finalizado`).
+
+Campos de una mesa: `name`, `shape` (`round` · `rect`), `capacity` (entero o `null`),
+`x` / `y` (posición en % dentro del plano), `guests` (lista de nombres).

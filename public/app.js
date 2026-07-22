@@ -397,17 +397,332 @@ $('cal-next').addEventListener('click', () => {
 });
 
 // ---------- Pestañas de vista ----------
+const VIEW_TABS = { list: 'tab-list', calendar: 'tab-calendar', mesas: 'tab-mesas' };
+const VIEW_SECTIONS = { list: 'view-list', calendar: 'view-calendar', mesas: 'view-mesas' };
 function switchView(view) {
-  const isList = view === 'list';
-  $('tab-list').classList.toggle('active', isList);
-  $('tab-calendar').classList.toggle('active', !isList);
-  $('tab-list').setAttribute('aria-selected', String(isList));
-  $('tab-calendar').setAttribute('aria-selected', String(!isList));
-  $('view-list').hidden = !isList;
-  $('view-calendar').hidden = isList;
+  Object.keys(VIEW_TABS).forEach((v) => {
+    const on = v === view;
+    $(VIEW_TABS[v]).classList.toggle('active', on);
+    $(VIEW_TABS[v]).setAttribute('aria-selected', String(on));
+    $(VIEW_SECTIONS[v]).hidden = !on;
+  });
+  // El formulario "Nueva actividad" solo aplica a la vista de lista.
+  $('agregar').hidden = view !== 'list';
 }
 $('tab-list').addEventListener('click', () => switchView('list'));
 $('tab-calendar').addEventListener('click', () => switchView('calendar'));
+$('tab-mesas').addEventListener('click', () => switchView('mesas'));
+
+// ========================================================================
+//  MESAS (croquis interactivo)
+// ========================================================================
+let tables = [];
+let currentTableId = null;   // mesa abierta en el modal
+
+async function loadTables() {
+  try {
+    const data = await api('/api/tables');
+    tables = data.tables || [];
+  } catch (e) {
+    tables = [];
+  }
+  renderPlano();
+}
+
+// ----- Selector de forma (pastillas) -----
+function setShape(pickerId, hiddenId, shape) {
+  if (hiddenId) $(hiddenId).value = shape;
+  document.querySelectorAll('#' + pickerId + ' .shape-opt').forEach((o) => {
+    const on = o.dataset.shape === shape;
+    o.classList.toggle('active', on);
+    o.setAttribute('aria-checked', String(on));
+  });
+}
+$('t-shape-picker').addEventListener('click', (e) => {
+  const opt = e.target.closest('.shape-opt');
+  if (opt) setShape('t-shape-picker', 't-shape', opt.dataset.shape);
+});
+
+// ----- Agregar mesa -----
+$('table-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = $('table-msg');
+  const name = $('t-name').value.trim();
+  if (!name) { showMsg(msg, 'Escribe el nombre de la mesa.', 'err'); return; }
+  const btn = $('t-add-btn');
+  btn.disabled = true;
+
+  // Posición inicial escalonada para que no se encimen.
+  const n = tables.length;
+  const x = 16 + (n % 4) * 22;
+  const y = Math.min(16 + Math.floor(n / 4) * 26, 88);
+
+  try {
+    const { table } = await api('/api/tables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        shape: $('t-shape').value,
+        capacity: $('t-cap').value === '' ? null : $('t-cap').value,
+        x, y,
+        guests: [],
+      }),
+    });
+    tables.push(table);
+    $('t-name').value = '';
+    $('t-cap').value = '';
+    setShape('t-shape-picker', 't-shape', 'round');
+    showMsg(msg, '¡Mesa agregada! 🪑', 'ok');
+    renderPlano();
+  } catch (err) {
+    showMsg(msg, err.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ----- Render del plano -----
+function tableCountText(t) {
+  const g = t.guests ? t.guests.length : 0;
+  return t.capacity ? `${g}/${t.capacity}` : `${g}`;
+}
+function isOver(t) {
+  return t.capacity != null && t.guests && t.guests.length > t.capacity;
+}
+
+function renderPlano() {
+  const plano = $('plano');
+  $('table-count').textContent = tables.length;
+
+  const totalGuests = tables.reduce((s, t) => s + (t.guests ? t.guests.length : 0), 0);
+  $('plano-total').textContent = tables.length
+    ? `${tables.length} mesa(s) · ${totalGuests} invitado(s) en total`
+    : '';
+
+  plano.querySelectorAll('.table-node').forEach((node) => node.remove());
+  $('tables-empty').hidden = tables.length > 0;
+  tables.forEach((t) => plano.appendChild(tableNodeEl(t)));
+}
+
+function tableNodeEl(t) {
+  const node = document.createElement('div');
+  node.className = 'table-node shape-' + t.shape + (isOver(t) ? ' over' : '');
+  node.style.left = t.x + '%';
+  node.style.top = t.y + '%';
+  node.dataset.id = t.id;
+
+  const shape = document.createElement('div');
+  shape.className = 'table-shape';
+  const nm = document.createElement('span');
+  nm.className = 't-name';
+  nm.textContent = t.name;
+  const cnt = document.createElement('span');
+  cnt.className = 't-count';
+  cnt.textContent = tableCountText(t);
+  shape.appendChild(nm);
+  shape.appendChild(cnt);
+  node.appendChild(shape);
+
+  const guests = t.guests || [];
+  if (guests.length) {
+    const ul = document.createElement('ul');
+    ul.className = 't-guests';
+    guests.slice(0, 8).forEach((g) => {
+      const li = document.createElement('li');
+      li.textContent = g;
+      ul.appendChild(li);
+    });
+    if (guests.length > 8) {
+      const li = document.createElement('li');
+      li.className = 'more';
+      li.textContent = `+${guests.length - 8} más`;
+      ul.appendChild(li);
+    }
+    node.appendChild(ul);
+  }
+
+  attachDrag(node, t);
+  return node;
+}
+
+// ----- Arrastrar mesas (y distinguir clic para abrir el modal) -----
+function attachDrag(node, t) {
+  let startX, startY, origX, origY, moved, rect;
+
+  function onMove(e) {
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+    moved = true;
+    let nx = origX + (dx / rect.width) * 100;
+    let ny = origY + (dy / rect.height) * 100;
+    nx = Math.max(2, Math.min(98, nx));
+    ny = Math.max(3, Math.min(97, ny));
+    t.x = nx; t.y = ny;
+    node.style.left = nx + '%';
+    node.style.top = ny + '%';
+  }
+
+  async function onUp(e) {
+    node.classList.remove('dragging');
+    node.removeEventListener('pointermove', onMove);
+    node.removeEventListener('pointerup', onUp);
+    try { node.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (moved) {
+      try {
+        await api('/api/tables/' + encodeURIComponent(t.id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: t.x, y: t.y }),
+        });
+      } catch (_) { /* la posición ya está en memoria */ }
+    } else {
+      openTableModal(t.id);
+    }
+  }
+
+  node.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    rect = $('plano').getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY;
+    origX = t.x; origY = t.y;
+    moved = false;
+    node.classList.add('dragging');
+    try { node.setPointerCapture(e.pointerId); } catch (_) {}
+    node.addEventListener('pointermove', onMove);
+    node.addEventListener('pointerup', onUp);
+  });
+}
+
+// ----- Modal: editar mesa e invitados -----
+function currentTable() {
+  return tables.find((t) => String(t.id) === String(currentTableId)) || null;
+}
+
+function openTableModal(id) {
+  currentTableId = id;
+  const t = currentTable();
+  if (!t) return;
+  $('modal-title').textContent = t.name;
+  $('m-name').value = t.name;
+  $('m-cap').value = t.capacity == null ? '' : t.capacity;
+  setShape('m-shape-picker', null, t.shape);
+  renderGuestList();
+  $('table-modal').hidden = false;
+  $('m-guest-input').focus();
+}
+
+function closeTableModal() {
+  $('table-modal').hidden = true;
+  currentTableId = null;
+}
+
+function renderGuestList() {
+  const t = currentTable();
+  if (!t) return;
+  const list = $('m-guest-list');
+  const guests = t.guests || [];
+  const counter = $('m-guest-counter');
+
+  $('m-guests-empty').hidden = guests.length > 0;
+  counter.textContent = t.capacity ? `${guests.length}/${t.capacity}` : `${guests.length} invitado(s)`;
+  counter.classList.toggle('over', isOver(t));
+
+  list.innerHTML = '';
+  guests.forEach((name, i) => {
+    const li = document.createElement('li');
+    li.className = 'guest-item';
+    const num = document.createElement('span'); num.className = 'g-num'; num.textContent = i + 1;
+    const nm = document.createElement('span'); nm.className = 'g-name'; nm.textContent = name;
+    const rm = document.createElement('button');
+    rm.className = 'icon-btn danger'; rm.textContent = '✕'; rm.title = 'Quitar invitado';
+    rm.addEventListener('click', () => removeGuest(i));
+    li.appendChild(num); li.appendChild(nm); li.appendChild(rm);
+    list.appendChild(li);
+  });
+}
+
+async function saveTable(changes) {
+  const t = currentTable();
+  if (!t) return null;
+  try {
+    const { table } = await api('/api/tables/' + encodeURIComponent(t.id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changes),
+    });
+    const i = tables.findIndex((x) => String(x.id) === String(t.id));
+    if (i !== -1) tables[i] = table;
+    renderPlano();
+    return table;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function addGuest() {
+  const input = $('m-guest-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const t = currentTable();
+  if (!t) return;
+  const guests = (t.guests || []).concat(name);
+  input.value = '';
+  input.focus();
+  if (await saveTable({ guests })) renderGuestList();
+}
+
+async function removeGuest(index) {
+  const t = currentTable();
+  if (!t) return;
+  const guests = (t.guests || []).slice();
+  guests.splice(index, 1);
+  if (await saveTable({ guests })) renderGuestList();
+}
+
+$('m-guest-add').addEventListener('click', addGuest);
+$('m-guest-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); addGuest(); }
+});
+$('m-shape-picker').addEventListener('click', (e) => {
+  const opt = e.target.closest('.shape-opt');
+  if (!opt) return;
+  setShape('m-shape-picker', null, opt.dataset.shape);
+  saveTable({ shape: opt.dataset.shape });
+});
+$('m-name').addEventListener('change', () => {
+  const v = $('m-name').value.trim();
+  const t = currentTable();
+  if (!t) return;
+  if (v) { saveTable({ name: v }); $('modal-title').textContent = v; }
+  else { $('m-name').value = t.name; }
+});
+$('m-cap').addEventListener('change', () => {
+  const raw = $('m-cap').value;
+  saveTable({ capacity: raw === '' ? null : raw }).then(() => renderGuestList());
+});
+$('m-delete').addEventListener('click', async () => {
+  const t = currentTable();
+  if (!t) return;
+  if (!confirm(`¿Eliminar "${t.name}" y sus invitados?`)) return;
+  try {
+    await api('/api/tables/' + encodeURIComponent(t.id), { method: 'DELETE' });
+    tables = tables.filter((x) => String(x.id) !== String(t.id));
+    closeTableModal();
+    renderPlano();
+  } catch (e) { /* noop */ }
+});
+$('m-done').addEventListener('click', closeTableModal);
+$('modal-close').addEventListener('click', closeTableModal);
+$('table-modal').addEventListener('click', (e) => {
+  if (e.target === $('table-modal')) closeTableModal();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('table-modal').hidden) closeTableModal();
+});
+
+$('print-croquis').addEventListener('click', () => window.print());
 
 // ---------- Init ----------
 (function init() {
@@ -416,4 +731,5 @@ $('tab-calendar').addEventListener('click', () => switchView('calendar'));
   calMonth = now.getMonth();
   renderSuggestions();
   loadActivities();
+  loadTables();
 })();

@@ -14,10 +14,12 @@ const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_KEY);
 // ---------------------------------------------------------------------------
 const DATA_DIR = path.join(__dirname, 'data');
 const ACTIVITIES_FILE = path.join(DATA_DIR, 'activities.json');
+const TABLES_FILE = path.join(DATA_DIR, 'tables.json');
 
 function ensureData() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(ACTIVITIES_FILE)) fs.writeFileSync(ACTIVITIES_FILE, '[]', 'utf8');
+  if (!fs.existsSync(TABLES_FILE)) fs.writeFileSync(TABLES_FILE, '[]', 'utf8');
 }
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return []; }
@@ -54,6 +56,34 @@ const fileBackend = {
     if (idx === -1) return false;
     list.splice(idx, 1);
     writeJson(ACTIVITIES_FILE, list);
+    return true;
+  },
+
+  // ----- Mesas -----
+  async getTables() {
+    return readJson(TABLES_FILE);
+  },
+  async addTable(table) {
+    const list = readJson(TABLES_FILE);
+    const full = { id: nextId(), ...table };
+    list.push(full);
+    writeJson(TABLES_FILE, list);
+    return full;
+  },
+  async updateTable(id, changes) {
+    const list = readJson(TABLES_FILE);
+    const t = list.find((x) => String(x.id) === String(id));
+    if (!t) return null;
+    Object.assign(t, changes);
+    writeJson(TABLES_FILE, list);
+    return t;
+  },
+  async deleteTable(id) {
+    const list = readJson(TABLES_FILE);
+    const idx = list.findIndex((x) => String(x.id) === String(id));
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    writeJson(TABLES_FILE, list);
     return true;
   },
 };
@@ -111,6 +141,20 @@ function rowToActivity(r) {
   };
 }
 
+function rowToTable(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    shape: r.shape || 'round',
+    capacity: r.capacity == null ? null : r.capacity,
+    x: r.pos_x == null ? 10 : r.pos_x,
+    y: r.pos_y == null ? 10 : r.pos_y,
+    guests: Array.isArray(r.guests) ? r.guests : [],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
 const supabaseBackend = {
   async getActivities() {
     const rows = await supabaseRequest('GET', '/activities?select=*&order=created_at.asc');
@@ -143,6 +187,45 @@ const supabaseBackend = {
   },
   async deleteActivity(id) {
     await supabaseRequest('DELETE', '/activities?id=eq.' + encodeURIComponent(id));
+    return true;
+  },
+
+  // ----- Mesas -----
+  async getTables() {
+    const rows = await supabaseRequest('GET', '/tables?select=*&order=created_at.asc');
+    return (rows || []).map(rowToTable);
+  },
+  async addTable(table) {
+    const rows = await supabaseRequest('POST', '/tables', [{
+      name: table.name,
+      shape: table.shape,
+      capacity: table.capacity,
+      pos_x: table.x,
+      pos_y: table.y,
+      guests: table.guests,
+      created_at: table.createdAt,
+      updated_at: table.updatedAt,
+    }]);
+    return rowToTable(rows[0]);
+  },
+  async updateTable(id, changes) {
+    const patch = {};
+    if ('name' in changes) patch.name = changes.name;
+    if ('shape' in changes) patch.shape = changes.shape;
+    if ('capacity' in changes) patch.capacity = changes.capacity;
+    if ('x' in changes) patch.pos_x = changes.x;
+    if ('y' in changes) patch.pos_y = changes.y;
+    if ('guests' in changes) patch.guests = changes.guests;
+    if ('updatedAt' in changes) patch.updated_at = changes.updatedAt;
+    const rows = await supabaseRequest(
+      'PATCH',
+      '/tables?id=eq.' + encodeURIComponent(id),
+      patch
+    );
+    return rows && rows[0] ? rowToTable(rows[0]) : null;
+  },
+  async deleteTable(id) {
+    await supabaseRequest('DELETE', '/tables?id=eq.' + encodeURIComponent(id));
     return true;
   },
 };

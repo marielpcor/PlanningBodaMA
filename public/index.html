@@ -98,6 +98,7 @@
     <div class="view-tabs" role="tablist" aria-label="Vista">
       <button class="view-tab active" id="tab-list" role="tab" aria-selected="true">📋 Lista</button>
       <button class="view-tab" id="tab-calendar" role="tab" aria-selected="false">📅 Calendario</button>
+      <button class="view-tab" id="tab-mesas" role="tab" aria-selected="false">🪑 Mesas</button>
     </div>
 
     <!-- ===== Vista LISTA ===== -->
@@ -137,7 +138,77 @@
       </div>
     </section>
 
+    <!-- ===== Vista MESAS (croquis) ===== -->
+    <section class="card view" id="view-mesas" hidden>
+      <div class="section-head">
+        <h2 class="section-title">Croquis de mesas <span class="count" id="table-count">0</span></h2>
+        <button type="button" class="btn-mini" id="print-croquis" title="Imprimir el croquis">🖨 Imprimir</button>
+      </div>
+      <p class="section-hint">Arrastra las mesas para colocarlas como en el salón. Toca una mesa para asignarle invitados.</p>
+
+      <!-- Agregar mesa -->
+      <form class="table-add" id="table-form" autocomplete="off">
+        <input type="text" id="t-name" placeholder="Nombre (ej. Mesa 1)" />
+        <div class="shape-picker" id="t-shape-picker" role="radiogroup" aria-label="Forma de la mesa">
+          <button type="button" class="shape-opt active" data-shape="round" role="radio" aria-checked="true">⬤ Redonda</button>
+          <button type="button" class="shape-opt" data-shape="rect" role="radio" aria-checked="false">▭ Rectangular</button>
+        </div>
+        <input type="hidden" id="t-shape" value="round" />
+        <input type="number" id="t-cap" min="0" max="100" placeholder="Cupo (opcional)" />
+        <button type="submit" class="btn" id="t-add-btn"><span class="btn-plus">＋</span> Agregar mesa</button>
+        <p class="form-msg" id="table-msg" role="status"></p>
+      </form>
+
+      <div class="plano" id="plano" aria-label="Plano de mesas"></div>
+      <p class="empty-state" id="tables-empty">Aún no hay mesas. ¡Agrega la primera! 🪑</p>
+      <p class="plano-hint" id="plano-total"></p>
+    </section>
+
   </main>
+
+  <!-- ===== Modal: editar mesa e invitados ===== -->
+  <div class="modal-overlay" id="table-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h3 class="modal-title" id="modal-title">Mesa</h3>
+        <button type="button" class="modal-close" id="modal-close" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="field">
+        <label for="m-name">Nombre de la mesa</label>
+        <input type="text" id="m-name" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Forma</label>
+          <div class="shape-picker" id="m-shape-picker" role="radiogroup" aria-label="Forma">
+            <button type="button" class="shape-opt" data-shape="round" role="radio" aria-checked="false">⬤ Redonda</button>
+            <button type="button" class="shape-opt" data-shape="rect" role="radio" aria-checked="false">▭ Rectangular</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="m-cap">Cupo <span class="optional">(opcional)</span></label>
+          <input type="number" id="m-cap" min="0" max="100" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label id="m-guests-label">Invitados <span class="guest-counter" id="m-guest-counter"></span></label>
+        <div class="guest-add">
+          <input type="text" id="m-guest-input" placeholder="Nombre del invitado…" />
+          <button type="button" class="btn btn-soft" id="m-guest-add">Añadir</button>
+        </div>
+        <ul class="guest-list" id="m-guest-list" aria-labelledby="m-guests-label"></ul>
+        <p class="empty-state" id="m-guests-empty">Aún no hay invitados en esta mesa.</p>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn-danger" id="m-delete">🗑 Eliminar mesa</button>
+        <button type="button" class="btn" id="m-done">Listo</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="footer">
     <div class="monogram-sm">M &amp; A</div>
