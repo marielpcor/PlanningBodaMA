@@ -482,6 +482,14 @@ $('table-form').addEventListener('submit', async (e) => {
   }
 });
 
+// ----- Invitados (nombre + estado) -----
+// Compatibilidad: un invitado puede ser un string (antiguo) o un objeto.
+function gName(g) { return typeof g === 'string' ? g : (g && g.name) || ''; }
+function gStatus(g) { return typeof g === 'string' ? 'pendiente' : ((g && g.status) || 'pendiente'); }
+function confirmedCount(t) {
+  return (t.guests || []).filter((g) => gStatus(g) === 'confirmado').length;
+}
+
 // ----- Render del plano -----
 function tableCountText(t) {
   const g = t.guests ? t.guests.length : 0;
@@ -496,8 +504,9 @@ function renderPlano() {
   $('table-count').textContent = tables.length;
 
   const totalGuests = tables.reduce((s, t) => s + (t.guests ? t.guests.length : 0), 0);
+  const totalConfirmed = tables.reduce((s, t) => s + confirmedCount(t), 0);
   $('plano-total').textContent = tables.length
-    ? `${tables.length} mesa(s) · ${totalGuests} invitado(s) en total`
+    ? `${tables.length} mesa(s) · ${totalGuests} invitado(s) · ✓ ${totalConfirmed} confirmado(s) · ○ ${totalGuests - totalConfirmed} pendiente(s)`
     : '';
 
   plano.querySelectorAll('.table-node').forEach((node) => node.remove());
@@ -533,7 +542,8 @@ function tableNodeEl(t) {
     ul.className = 't-guests';
     guests.slice(0, 8).forEach((g) => {
       const li = document.createElement('li');
-      li.textContent = g;
+      li.className = 'g-' + gStatus(g);
+      li.textContent = (gStatus(g) === 'confirmado' ? '✓ ' : '○ ') + gName(g);
       ul.appendChild(li);
     });
     if (guests.length > 8) {
@@ -629,20 +639,32 @@ function renderGuestList() {
   const counter = $('m-guest-counter');
 
   $('m-guests-empty').hidden = guests.length > 0;
-  counter.textContent = t.capacity ? `${guests.length}/${t.capacity}` : `${guests.length} invitado(s)`;
+  const conf = confirmedCount(t);
+  const base = t.capacity ? `${guests.length}/${t.capacity}` : `${guests.length} invitado(s)`;
+  counter.textContent = guests.length ? `${base} · ✓ ${conf} confirmado(s)` : base;
   counter.classList.toggle('over', isOver(t));
 
   const others = tables.filter((x) => String(x.id) !== String(t.id));
 
   list.innerHTML = '';
-  guests.forEach((name, i) => {
+  guests.forEach((g, i) => {
+    const status = gStatus(g);
     const li = document.createElement('li');
     li.className = 'guest-item';
     const num = document.createElement('span'); num.className = 'g-num'; num.textContent = i + 1;
-    const nm = document.createElement('span'); nm.className = 'g-name'; nm.textContent = name;
+    const nm = document.createElement('span'); nm.className = 'g-name'; nm.textContent = gName(g);
 
     li.appendChild(num);
     li.appendChild(nm);
+
+    // Alternar Confirmado / Pendiente
+    const st = document.createElement('button');
+    st.type = 'button';
+    st.className = 'guest-status ' + status;
+    st.textContent = status === 'confirmado' ? '✓ Confirmado' : '○ Pendiente';
+    st.title = 'Cambiar a ' + (status === 'confirmado' ? 'pendiente' : 'confirmado');
+    st.addEventListener('click', () => toggleGuestStatus(i));
+    li.appendChild(st);
 
     // Mover a otra mesa
     if (others.length) {
@@ -677,12 +699,12 @@ async function moveGuest(index, targetId) {
   if (!t) return;
   const target = tables.find((x) => String(x.id) === String(targetId));
   if (!target) return;
-  const name = (t.guests || [])[index];
-  if (name == null) return;
+  const guest = (t.guests || [])[index];
+  if (guest == null) return;
 
   const srcGuests = (t.guests || []).slice();
   srcGuests.splice(index, 1);
-  const dstGuests = (target.guests || []).concat(name);
+  const dstGuests = (target.guests || []).concat(guest);
 
   // Actualiza la mesa destino…
   try {
@@ -724,9 +746,19 @@ async function addGuest() {
   if (!name) return;
   const t = currentTable();
   if (!t) return;
-  const guests = (t.guests || []).concat(name);
+  const guests = (t.guests || []).concat({ name, status: 'pendiente' });
   input.value = '';
   input.focus();
+  if (await saveTable({ guests })) renderGuestList();
+}
+
+// Alterna el estado de un invitado entre confirmado y pendiente.
+async function toggleGuestStatus(index) {
+  const t = currentTable();
+  if (!t) return;
+  const guests = (t.guests || []).map((g) => ({ name: gName(g), status: gStatus(g) }));
+  if (!guests[index]) return;
+  guests[index].status = guests[index].status === 'confirmado' ? 'pendiente' : 'confirmado';
   if (await saveTable({ guests })) renderGuestList();
 }
 
@@ -787,7 +819,7 @@ function applySearchHighlight() {
   const ids = new Set();
   if (q) {
     tables.forEach((t) => {
-      if ((t.guests || []).some((g) => g.toLowerCase().includes(q))) ids.add(String(t.id));
+      if ((t.guests || []).some((g) => gName(g).toLowerCase().includes(q))) ids.add(String(t.id));
     });
   }
   document.querySelectorAll('#plano .table-node').forEach((n) => {
@@ -805,7 +837,7 @@ function renderGuestSearch() {
   const matches = [];
   tables.forEach((t) => {
     (t.guests || []).forEach((g) => {
-      if (g.toLowerCase().includes(q)) matches.push({ guest: g, table: t });
+      if (gName(g).toLowerCase().includes(q)) matches.push({ guest: g, table: t });
     });
   });
 
@@ -822,7 +854,9 @@ function renderGuestSearch() {
   matches.slice(0, 25).forEach((m) => {
     const li = document.createElement('li');
     li.className = 'search-result';
-    const nm = document.createElement('span'); nm.className = 'sr-name'; nm.textContent = m.guest;
+    const nm = document.createElement('span');
+    nm.className = 'sr-name';
+    nm.textContent = (gStatus(m.guest) === 'confirmado' ? '✓ ' : '○ ') + gName(m.guest);
     const tb = document.createElement('span'); tb.className = 'sr-table'; tb.textContent = '→ ' + m.table.name;
     li.appendChild(nm); li.appendChild(tb);
     li.addEventListener('click', () => openTableModal(m.table.id));
@@ -837,16 +871,25 @@ function exportList() {
   if (!tables.length) { alert('Aún no hay mesas que exportar.'); return; }
   const lines = ['Croquis de mesas — M & A', '========================', ''];
   let total = 0;
+  let totalConf = 0;
   tables.forEach((t) => {
     const g = t.guests || [];
+    const conf = confirmedCount(t);
     total += g.length;
+    totalConf += conf;
     const cap = t.capacity ? `/${t.capacity}` : '';
-    lines.push(`${t.name} (${g.length}${cap})`);
-    if (g.length) g.forEach((name, i) => lines.push(`  ${i + 1}. ${name}`));
-    else lines.push('  (sin invitados)');
+    lines.push(`${t.name} (${g.length}${cap}) — ✓ ${conf} confirmado(s), ○ ${g.length - conf} pendiente(s)`);
+    if (g.length) {
+      g.forEach((guest, i) => {
+        const mark = gStatus(guest) === 'confirmado' ? '[✓]' : '[ ]';
+        lines.push(`  ${i + 1}. ${mark} ${gName(guest)}`);
+      });
+    } else {
+      lines.push('  (sin invitados)');
+    }
     lines.push('');
   });
-  lines.push(`Total: ${tables.length} mesa(s) · ${total} invitado(s)`);
+  lines.push(`Total: ${tables.length} mesa(s) · ${total} invitado(s) · ✓ ${totalConf} confirmado(s) · ○ ${total - totalConf} pendiente(s)`);
 
   const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);

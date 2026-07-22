@@ -95,14 +95,23 @@ function normalizeCoord(raw, fallback) {
   if (Number.isNaN(n)) return fallback;
   return Math.max(0, Math.min(100, n));
 }
-// Lista de invitados: strings no vacíos.
+// Lista de invitados: cada uno es { name, status }.
+// Acepta strings (compatibilidad) u objetos; normaliza a objeto.
+const GUEST_STATUSES = ['confirmado', 'pendiente'];
 function normalizeGuests(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((g) => String(g).trim())
+    .map((g) => {
+      if (g && typeof g === 'object') {
+        const name = String(g.name || '').trim();
+        const status = GUEST_STATUSES.includes(g.status) ? g.status : 'pendiente';
+        return name ? { name: name.slice(0, 60), status } : null;
+      }
+      const name = String(g).trim();
+      return name ? { name: name.slice(0, 60), status: 'pendiente' } : null;
+    })
     .filter(Boolean)
-    .slice(0, 60)
-    .map((g) => g.slice(0, 60));
+    .slice(0, 60);
 }
 
 // ---------- Lógica de actividades ----------
